@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.migrate.joda.templates;
 
+import lombok.Getter;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.MethodMatcher;
 
@@ -23,10 +24,8 @@ import java.util.List;
 
 import static org.openrewrite.java.migrate.joda.templates.TimeClassNames.*;
 
-public class DateTimeFormatTemplates {
+public class DateTimeFormatTemplates implements Templates {
     private final MethodMatcher forPattern = new MethodMatcher(JODA_TIME_FORMAT + " forPattern(String)");
-    private final MethodMatcher forStyle = new MethodMatcher(JODA_TIME_FORMAT + " forStyle(String)");
-    private final MethodMatcher patternForStyle = new MethodMatcher(JODA_TIME_FORMAT + " patternForStyle(String, java.util.Locale)");
     private final MethodMatcher shortDate = new MethodMatcher(JODA_TIME_FORMAT + " shortDate()");
     private final MethodMatcher mediumDate = new MethodMatcher(JODA_TIME_FORMAT + " mediumDate()");
     private final MethodMatcher longDate = new MethodMatcher(JODA_TIME_FORMAT + " longDate()");
@@ -79,6 +78,8 @@ public class DateTimeFormatTemplates {
     private final JavaTemplate fullDateTimeTemplate = JavaTemplate.builder("DateTimeFormatter.ofLocalizedDateTime(FormatStyle.FULL, FormatStyle.FULL)")
             .imports(JAVA_TIME_FORMATTER, JAVA_TIME_FORMAT_STYLE)
             .build();
+
+    @Getter
     private final List<MethodTemplate> templates = new ArrayList<MethodTemplate>() {
         {
             add(new MethodTemplate(forPattern, ofPatternTemplate));
@@ -96,8 +97,4 @@ public class DateTimeFormatTemplates {
             add(new MethodTemplate(fullDateTime, fullDateTimeTemplate));
         }
     };
-
-    public static List<MethodTemplate> getTemplates() {
-        return new DateTimeFormatTemplates().templates;
-    }
 }

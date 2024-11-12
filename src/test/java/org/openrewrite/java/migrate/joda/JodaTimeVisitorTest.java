@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.migrate.joda;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.java.JavaParser;
@@ -28,7 +29,7 @@ class JodaTimeVisitorTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec
-          .recipe(toRecipe(JodaTimeVisitor::new))
+          .recipe(toRecipe(() -> new JodaTimeVisitor()))
           .parser(JavaParser.fromJavaVersion().classpath("joda-time"));
     }
 
@@ -286,7 +287,7 @@ class JodaTimeVisitorTest implements RewriteTest {
     }
 
     @Test
-    void migrateDateTimeFormatter() {
+    void migrateDateTimeFormat() {
         //language=java
         rewriteRun(
           java(
@@ -414,6 +415,203 @@ class JodaTimeVisitorTest implements RewriteTest {
     }
 
     @Test
+    void migrateAbstractInstant() {
+        // language=java
+        rewriteRun(
+          java(
+            """
+              import org.joda.time.DateTime;
+              import org.joda.time.Duration;import org.joda.time.Instant;
+              import org.joda.time.format.DateTimeFormat;
+              
+              class A {
+                  public void foo() {
+                      new DateTime().equals(DateTime.now());
+                      new DateTime().getZone();
+                      new DateTime().isAfter(1234567890L);
+                      new Instant().isAfter(1234567890L);
+                      new DateTime().isAfter(DateTime.now().minusDays(1));
+                      new Instant().isAfter(Instant.now().minus(Duration.standardDays(1)));
+                      new DateTime().isBefore(1234567890L);
+                      new Instant().isBefore(1234567890L);
+                      new DateTime().isBefore(DateTime.now().plusDays(1));
+                      new Instant().isBefore(Instant.now().plus(Duration.standardDays(1)));
+                      new DateTime().isBeforeNow();
+                      new DateTime().isEqual(1234567890L);
+                      new DateTime().isEqual(DateTime.now().plusDays(1));
+                      new DateTime().toDate();
+                      new DateTime().toInstant();
+                      new DateTime().toString();
+                      new DateTime().toString(DateTimeFormat.forPattern("yyyy-MM-dd'T'HH:mm:ss"));
+                  }
+              }
+              """,
+            """
+              import java.time.Duration;
+              import java.time.Instant;
+              import java.time.ZoneId;
+              import java.time.ZonedDateTime;
+              import java.time.format.DateTimeFormatter;
+              import java.util.Date;
+              
+              class A {
+                  public void foo() {
+                      ZonedDateTime.now().equals(ZonedDateTime.now());
+                      ZonedDateTime.now().getZone();
+                      ZonedDateTime.now().isAfter(Instant.ofEpochMilli(1234567890L).atZone(ZoneId.systemDefault()));
+                      Instant.now().isAfter(Instant.ofEpochMilli(1234567890L));
+                      ZonedDateTime.now().isAfter(ZonedDateTime.now().minusDays(1));
+                      Instant.now().isAfter(Instant.now().minus(Duration.ofDays(1)));
+                      ZonedDateTime.now().isBefore(Instant.ofEpochMilli(1234567890L).atZone(ZoneId.systemDefault()));
+                      Instant.now().isBefore(Instant.ofEpochMilli(1234567890L));
+                      ZonedDateTime.now().isBefore(ZonedDateTime.now().plusDays(1));
+                      Instant.now().isBefore(Instant.now().plus(Duration.ofDays(1)));
+                      ZonedDateTime.now().isBefore(ZonedDateTime.now());
+                      ZonedDateTime.now().isEqual(Instant.ofEpochMilli(1234567890L).atZone(ZoneId.systemDefault()));
+                      ZonedDateTime.now().isEqual(ZonedDateTime.now().plusDays(1));
+                      Date.from(ZonedDateTime.now().toInstant());
+                      ZonedDateTime.now().toInstant();
+                      ZonedDateTime.now().toString();
+                      ZonedDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss"));
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Disabled
+    @Test
+    void migrateAbstractDateTime() {
+        // language=java
+        rewriteRun(
+          java(
+            """
+              import org.joda.time.DateTime;
+              
+              class A {
+                  public void foo() {
+                      new DateTime().getDayOfMonth();
+                      new DateTime().getDayOfWeek();
+                      new DateTime().getHourOfDay();
+                      new DateTime().getMillisOfSecond();
+                      new DateTime().getMinuteOfDay();
+                      new DateTime().getMinuteOfHour();
+                      new DateTime().getMonthOfYear();
+                      new DateTime().getSecondOfDay();
+                      new DateTime().getSecondOfMinute();
+                      new DateTime().getWeekOfWeekyear();
+                      new DateTime().toString();
+                  }
+              }
+              """,
+            """
+              import java.time.ZonedDateTime;
+              import java.time.temporal.ChronoField;
+              
+              class A {
+                  public void foo() {
+                      ZonedDateTime.now().getDayOfMonth();
+                      ZonedDateTime.now().getDayOfWeek().getValue();
+                      ZonedDateTime.now().getHour();
+                      ZonedDateTime.now().get(ChronoField.MILLI_OF_SECOND);
+                      ZonedDateTime.now().get(ChronoField.MINUTE_OF_DAY);
+                      ZonedDateTime.now().getMinute();
+                      ZonedDateTime.now().getMonthValue();
+                      ZonedDateTime.now().get(ChronoField.SECOND_OF_DAY);
+                      ZonedDateTime.now().getSecond();
+                      ZonedDateTime.now().get(ChronoField.ALIGNED_WEEK_OF_YEAR);
+                      ZonedDateTime.now().toString();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void migrateDateTimeFormatter() {
+        // language=java
+        rewriteRun(
+          java(
+            """
+              import org.joda.time.format.DateTimeFormat;
+              import org.joda.time.DateTime;
+              import org.joda.time.DateTimeZone;
+              
+              class A {
+                  public void foo() {
+                      DateTimeFormat.forPattern("yyyy-MM-dd'T'HH:mm:ss").parseDateTime("2024-10-25T15:45:00");
+                      DateTimeFormat.forPattern("yyyy-MM-dd'T'HH:mm:ss").parseMillis("2024-10-25T15:45:00");
+                      DateTimeFormat.forPattern("yyyy-MM-dd'T'HH:mm:ss").print(1234567890L);
+                      DateTimeFormat.forPattern("yyyy-MM-dd'T'HH:mm:ss").print(new DateTime());
+                      DateTimeFormat.forPattern("yyyy-MM-dd'T'HH:mm:ss").withZone(DateTimeZone.UTC);
+                      DateTimeFormat.forPattern("yyyy-MM-dd'T'HH:mm:ss").withZoneUTC();
+                  }
+              }
+              """,
+            """
+              import java.time.Instant;
+              import java.time.ZoneId;
+              import java.time.ZoneOffset;
+              import java.time.ZonedDateTime;
+              import java.time.format.DateTimeFormatter;
+              
+              class A {
+                  public void foo() {
+                      ZonedDateTime.parse("2024-10-25T15:45:00", DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss"));
+                      ZonedDateTime.parse("2024-10-25T15:45:00", DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")).toInstant().toEpochMilli();
+                      ZonedDateTime.ofInstant(Instant.ofEpochMilli(1234567890L), ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss"));
+                      ZonedDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss"));
+                      DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss").withZone(ZoneOffset.UTC);
+                      DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss").withZone(ZoneOffset.UTC);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void migrateInstant() {
+        // language=java
+        rewriteRun(
+          java(
+            """
+              import org.joda.time.Instant;
+              import org.joda.time.Duration;
+              
+              class A {
+                  public void foo() {
+                      System.out.println(new Instant());
+                      System.out.println(Instant.now().getMillis());
+                      System.out.println(Instant.now().minus(Duration.standardDays(1L)));
+                      System.out.println(Instant.ofEpochMilli(1234567890L));
+                      System.out.println(Instant.parse("2024-10-25T15:45:00"));
+                      System.out.println(Instant.now().plus(Duration.standardDays(1L)));
+                  }
+              }
+              """,
+            """
+              import java.time.Duration;
+              import java.time.Instant;
+              
+              class A {
+                  public void foo() {
+                      System.out.println(Instant.now());
+                      System.out.println(Instant.now().toEpochMilli());
+                      System.out.println(Instant.now().minus(Duration.ofDays(1L)));
+                      System.out.println(Instant.ofEpochMilli(1234567890L));
+                      System.out.println(Instant.parse("2024-10-25T15:45:00"));
+                      System.out.println(Instant.now().plus(Duration.ofDays(1L)));
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void migrateClassesWithFqn() {
         // language=java
         rewriteRun(
@@ -467,54 +665,6 @@ class JodaTimeVisitorTest implements RewriteTest {
         );
     }
 
-    // Test will be removed once safe variable migration is implemented
-    @Test
-    void dontChangeMethodAccessOnVariable() {
-        //language=java
-        rewriteRun(
-          java(
-            """
-              import org.joda.time.DateTime;
-              
-              class A {
-                  public void foo() {
-                      DateTime dt = new DateTime();
-                      System.out.println(dt.toDateTime());
-                      System.out.println(new B().dateTime.toDateTime());
-                  }
-                  public static class B {
-                      DateTime dateTime = new DateTime();
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @Test
-    void dontChangeIncompatibleType() {
-        //language=java
-        rewriteRun(
-          java(
-            """
-              import org.joda.time.DateTime;
-              
-              class A {
-                  public void foo() {
-                      new B().print(new DateTime()); // print is public method accepting DateTime, not handled yet
-                  }
-              }
-              
-              class B {
-                  public void print(DateTime dateTime) {
-                      System.out.println(dateTime);
-                  }
-              }
-              """
-          )
-        );
-    }
-
     @Test
     void dontChangeMethodsWithUnhandledArguments() {
         //language=java
@@ -528,6 +678,51 @@ class JodaTimeVisitorTest implements RewriteTest {
                   public void foo() {
                       // DateTimeFormat.forStyle is unhandled so parent method should not be changed
                       System.out.println(DateTime.parse("2024-09-30T23:03:00.000Z", DateTimeFormat.forStyle("SS")));
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void unhandledCases() {
+        //language=java
+        rewriteRun(
+          java(
+            """
+              import org.joda.time.Interval;
+              
+              class A {
+                  public void foo() {
+                      new Interval(100, 50);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void methodInvocationWithStaticImport() {
+        //language=java
+        rewriteRun(
+          java(
+            """
+              import static org.joda.time.DateTime.now;
+              
+              class A {
+                  public void foo() {
+                      now();
+                  }
+              }
+              """,
+            """
+              import java.time.ZonedDateTime;
+              
+              class A {
+                  public void foo() {
+                      ZonedDateTime.now();
                   }
               }
               """
